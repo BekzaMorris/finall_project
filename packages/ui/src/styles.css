@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+/*
+ * Theme System using CSS Custom Properties
+ * Dark theme is the default. Light theme is applied via .light class on <html>.
+ */
+
+@theme {
+  /* Surface colors */
+  --color-surface-primary: var(--theme-surface-primary);
+  --color-surface-secondary: var(--theme-surface-secondary);
+  --color-surface-tertiary: var(--theme-surface-tertiary);
+
+  /* Accent colors */
+  --color-accent-primary: var(--theme-accent-primary);
+  --color-accent-secondary: var(--theme-accent-secondary);
+
+  /* Text colors */
+  --color-text-primary: var(--theme-text-primary);
+  --color-text-secondary: var(--theme-text-secondary);
+  --color-text-tertiary: var(--theme-text-tertiary);
+
+  /* Status colors */
+  --color-status-success: var(--theme-status-success);
+  --color-status-warning: var(--theme-status-warning);
+  --color-status-error: var(--theme-status-error);
+
+  /* Border */
+  --color-border-primary: var(--theme-border-primary);
+  --color-border-secondary: var(--theme-border-secondary);
+}
+
+/* Dark theme (default) */
+:root {
+  --theme-surface-primary: #0f1117;
+  --theme-surface-secondary: #161b22;
+  --theme-surface-tertiary: #1c2128;
+
+  --theme-accent-primary: #2563eb;
+  --theme-accent-secondary: #0ea5e9;
+
+  --theme-text-primary: #e6edf3;
+  --theme-text-secondary: #8b949e;
+  --theme-text-tertiary: #484f58;
+
+  --theme-status-success: #3fb950;
+  --theme-status-warning: #d29922;
+  --theme-status-error: #f85149;
+
+  --theme-border-primary: #30363d;
+  --theme-border-secondary: #21262d;
+}
+
+/* Light theme */
+.light {
+  --theme-surface-primary: #f8f9fa;
+  --theme-surface-secondary: #ffffff;
+  --theme-surface-tertiary: #f0f1f3;
+
+  --theme-accent-primary: #2563eb;
+  --theme-accent-secondary: #0ea5e9;
+
+  --theme-text-primary: #1f2328;
+  --theme-text-secondary: #656d76;
+  --theme-text-tertiary: #8b949e;
+
+  --theme-status-success: #1a7f37;
+  --theme-status-warning: #9a6700;
+  --theme-status-error: #cf222e;
+
+  --theme-border-primary: #d0d7de;
+  --theme-border-secondary: #e8ecf0;
+}

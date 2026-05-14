@@ -1,0 +1,6 @@
+@import "@kiroportal/ui/styles.css";
+
+/* App-level base styles */
+body {
+  min-height: 100dvh;
+}

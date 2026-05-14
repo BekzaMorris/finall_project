@@ -1,0 +1,329 @@
+// Server Sales Portal - Prisma Schema
+// PostgreSQL 16 with full-text search support
+
+generator client {
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  previewFeatures = ["fullTextSearchPostgres"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum Condition {
+  NEW
+  USED
+  REFURBISHED
+}
+
+enum StockStatus {
+  IN_STOCK
+  LOW_STOCK
+  OUT_OF_STOCK
+  PRE_ORDER
+}
+
+enum Role {
+  CLIENT
+  MANAGER
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_CUSTOMER
+  RESOLVED
+  CLOSED
+}
+
+enum QuoteStatus {
+  PENDING
+  CONTACTED
+  CONVERTED
+  EXPIRED
+}
+
+// ─── Product ─────────────────────────────────────────────────────────────────
+
+model Product {
+  id          String      @id @default(cuid())
+  slug        String      @unique
+  name        String
+  sku         String      @unique
+  brand       String
+  condition   Condition
+  price       Decimal     @db.Decimal(12, 2)
+  priceOld    Decimal?    @db.Decimal(12, 2)
+  stock       Int         @default(0)
+  stockStatus StockStatus
+
+  // CPU Specifications
+  cpuFamily   String?
+  cpuModel    String?
+  cpuCores    Int?
+  cpuThreads  Int?
+  cpuFreqMhz  Int?
+  cpuBoostMhz Int?
+  cpuSocket   String?
+  cpuCount    Int?    @default(1)
+  cpuMaxCount Int?
+
+  // RAM Specifications
+  ramGb         Int?
+  ramType       String?
+  ramFreqMhz    Int?
+  ramSlotsUsed  Int?
+  ramSlotsTotal Int?
+
+  // Storage Specifications
+  diskType    String?
+  diskGb      Int?
+  diskBays    Int?
+  diskRaid    String?
+  diskHotswap Boolean? @default(false)
+
+  // Form Factor / Physical
+  formFactor String?
+  unitCount  Int?
+  psuWatt    Int?
+  weightKg   Decimal? @db.Decimal(6, 2)
+
+  // Metadata
+  customFields Json?    @default("{}")
+  description  String?  @db.Text
+  isActive     Boolean  @default(true)
+  isFeatured   Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  images     ProductImage[]
+  orderItems OrderItem[]
+  cartItems  CartItem[]
+  favorites  Favorite[]
+
+  // Indexes for filtering
+  @@index([condition])
+  @@index([brand])
+  @@index([price])
+  @@index([cpuCores])
+  @@index([ramGb])
+  @@index([stockStatus])
+  @@index([createdAt])
+  // Composite indexes for common filter combinations
+  @@index([condition, brand, price])
+  @@index([cpuCores, ramGb])
+  @@map("products")
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  productId String
+  url       String
+  alt       String?
+  order     Int     @default(0)
+  isMain    Boolean @default(false)
+
+  // Relations
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@map("product_images")
+}
+
+// ─── User ────────────────────────────────────────────────────────────────────
+
+model User {
+  id          String    @id @default(cuid())
+  email       String    @unique
+  password    String
+  name        String
+  company     String?
+  phone       String?
+  role        Role      @default(CLIENT)
+  isActive    Boolean   @default(true)
+  lastLoginAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  orders          Order[]
+  tickets         Ticket[]        @relation("TicketCreator")
+  assignedTickets Ticket[]        @relation("TicketAssignee")
+  ticketMessages  TicketMessage[]
+  cartItems       CartItem[]
+  favorites       Favorite[]
+  quotes          Quote[]
+
+  @@map("users")
+}
+
+// ─── Order ───────────────────────────────────────────────────────────────────
+
+model Order {
+  id              String      @id @default(cuid())
+  orderNumber     String      @unique
+  userId          String?
+  contactName     String
+  phone           String
+  email           String
+  company         String?
+  comment         String?     @db.Text
+  deliveryAddress String?     @db.Text
+  status          OrderStatus @default(PENDING)
+  statusHistory   Json        @default("[]")
+  totalAmount     Decimal     @db.Decimal(12, 2)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Relations
+  user  User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  items OrderItem[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("orders")
+}
+
+model OrderItem {
+  id          String  @id @default(cuid())
+  orderId     String
+  productId   String
+  productName String
+  productSlug String
+  quantity    Int
+  unitPrice   Decimal @db.Decimal(12, 2)
+  totalPrice  Decimal @db.Decimal(12, 2)
+
+  // Relations
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("order_items")
+}
+
+// ─── Ticket ──────────────────────────────────────────────────────────────────
+
+model Ticket {
+  id           String         @id @default(cuid())
+  number       String         @unique
+  userId       String?
+  email        String
+  subject      String
+  category     String?
+  priority     TicketPriority @default(MEDIUM)
+  status       TicketStatus   @default(OPEN)
+  assignedToId String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  resolvedAt   DateTime?
+
+  // Relations
+  user       User?           @relation("TicketCreator", fields: [userId], references: [id], onDelete: SetNull)
+  assignedTo User?           @relation("TicketAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  messages   TicketMessage[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([priority])
+  @@index([assignedToId])
+  @@index([createdAt])
+  @@map("tickets")
+}
+
+model TicketMessage {
+  id          String   @id @default(cuid())
+  ticketId    String
+  userId      String?
+  content     String   @db.Text
+  attachments Json     @default("[]")
+  isInternal  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  // Relations
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([ticketId])
+  @@index([userId])
+  @@map("ticket_messages")
+}
+
+// ─── Cart ────────────────────────────────────────────────────────────────────
+
+model CartItem {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now())
+
+  // Relations
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@index([userId])
+  @@map("cart_items")
+}
+
+// ─── Favorite ────────────────────────────────────────────────────────────────
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String
+  createdAt DateTime @default(now())
+
+  // Relations
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@index([userId])
+  @@map("favorites")
+}
+
+// ─── Quote ───────────────────────────────────────────────────────────────────
+
+model Quote {
+  id            String      @id @default(cuid())
+  userId        String?
+  contactName   String
+  contactEmail  String
+  contactPhone  String
+  company       String?
+  configuration Json
+  status        QuoteStatus @default(PENDING)
+  createdAt     DateTime    @default(now())
+
+  // Relations
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([status])
+  @@map("quotes")
+}
