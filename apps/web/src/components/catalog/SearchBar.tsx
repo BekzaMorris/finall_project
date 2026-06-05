@@ -18,7 +18,7 @@ const conditionLabels: Record<Condition, { label: string; variant: 'success' | '
 function formatPrice(price: number): string {
   return new Intl.NumberFormat('ru-RU', {
     style: 'currency',
-    currency: 'RUB',
+    currency: 'KZT',
     maximumFractionDigits: 0,
   }).format(price);
 }

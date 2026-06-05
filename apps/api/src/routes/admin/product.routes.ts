@@ -227,4 +227,53 @@ router.delete(
   },
 );
 
+/**
+ * DELETE /api/admin/products/:id/images
+ * Delete all images for a product.
+ * Requires ADMIN role.
+ */
+router.delete(
+  '/:id/images',
+  requireAuth,
+  requireAdmin,
+  async (req: Request, res: Response): Promise<void> => {
+    const id = req.params.id as string;
+    await prisma.productImage.deleteMany({ where: { productId: id } });
+    res.status(200).json({ message: 'Images deleted' });
+  },
+);
+
+/**
+ * POST /api/admin/products/:id/images
+ * Add an image to a product.
+ * Requires ADMIN role.
+ */
+router.post(
+  '/:id/images',
+  requireAuth,
+  requireAdmin,
+  async (req: Request, res: Response): Promise<void> => {
+    const id = req.params.id as string;
+    const { url, alt, order, isMain } = req.body;
+
+    const product = await prisma.product.findUnique({ where: { id }, select: { id: true } });
+    if (!product) {
+      res.status(404).json({ error: 'Product not found' });
+      return;
+    }
+
+    const image = await prisma.productImage.create({
+      data: {
+        productId: id,
+        url,
+        alt: alt || null,
+        order: order ?? 0,
+        isMain: isMain ?? false,
+      },
+    });
+
+    res.status(201).json(image);
+  },
+);
+
 export { router as adminProductRouter };

@@ -69,6 +69,8 @@ export default function AdminUsersPage() {
 
   // Deactivation confirmation modal
   const [deactivateTarget, setDeactivateTarget] = useState<UserItem | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<UserItem | null>(null);
 
   // Fetch users
   const { data, isLoading, isError } = useQuery<UsersResponse>({
@@ -115,6 +117,26 @@ export default function AdminUsersPage() {
     },
   });
 
+  // Delete mutation
+  const deleteMutation = useMutation({
+    mutationFn: (userId: string) =>
+      apiClient(`/admin/users/${userId}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      setDeleteTarget(null);
+    },
+  });
+
+  // Create user mutation
+  const createUserMutation = useMutation({
+    mutationFn: (data: { email: string; password: string; name: string; role: string; company?: string; phone?: string }) =>
+      apiClient('/admin/users', { method: 'POST', body: data }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      setShowCreateModal(false);
+    },
+  });
+
   // Pagination handlers
   const handleNextPage = () => {
     if (data?.nextCursor) {
@@ -143,11 +165,19 @@ export default function AdminUsersPage() {
             Управление учётными записями и ролями
           </p>
         </div>
-        {data && (
-          <span className="text-sm text-text-secondary">
-            Всего: {data.totalCount}
-          </span>
-        )}
+        <div className="flex items-center gap-3">
+          {data && (
+            <span className="text-sm text-text-secondary">
+              Всего: {data.totalCount}
+            </span>
+          )}
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="inline-flex items-center gap-2 rounded-lg bg-accent-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-accent-primary/90 transition-colors"
+          >
+            + Добавить
+          </button>
+        </div>
       </div>
 
       {/* Loading state */}
@@ -194,6 +224,7 @@ export default function AdminUsersPage() {
                     }
                     onDeactivate={() => setDeactivateTarget(user)}
                     onActivate={() => activateMutation.mutate(user.id)}
+                    onDelete={() => setDeleteTarget(user)}
                     isRoleChanging={changeRoleMutation.isPending}
                     isActivating={activateMutation.isPending}
                   />
@@ -273,6 +304,22 @@ export default function AdminUsersPage() {
           </div>
         </div>
       </Modal>
+
+      {/* Create user modal */}
+      <CreateUserModal
+        open={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSubmit={(data) => createUserMutation.mutate(data)}
+        isPending={createUserMutation.isPending}
+      />
+
+      {/* Delete user modal */}
+      <DeleteUserModal
+        user={deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => { if (deleteTarget) deleteMutation.mutate(deleteTarget.id); }}
+        isPending={deleteMutation.isPending}
+      />
     </div>
   );
 }
@@ -285,6 +332,7 @@ interface UserRowProps {
   onRoleChange: (role: Role) => void;
   onDeactivate: () => void;
   onActivate: () => void;
+  onDelete: () => void;
   isRoleChanging: boolean;
   isActivating: boolean;
 }
@@ -295,6 +343,7 @@ function UserRow({
   onRoleChange,
   onDeactivate,
   onActivate,
+  onDelete,
   isRoleChanging,
   isActivating,
 }: UserRowProps) {
@@ -397,6 +446,16 @@ function UserRow({
             Активировать
           </Button>
         )}
+        {!isSelf && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-status-error hover:text-status-error hover:bg-status-error/10 ml-1"
+            onClick={onDelete}
+          >
+            Удалить
+          </Button>
+        )}
       </td>
     </tr>
   );
@@ -447,5 +506,68 @@ function UsersTableSkeleton() {
         </tbody>
       </table>
     </div>
+  );
+}
+
+// ─── Create User Modal ───────────────────────────────────────────────────────
+
+function CreateUserModal({ open, onClose, onSubmit, isPending }: { open: boolean; onClose: () => void; onSubmit: (data: any) => void; isPending: boolean }) {
+  const [form, setForm] = useState({ email: '', password: '', name: '', role: 'CLIENT', company: '', phone: '' });
+
+  if (!open) return null;
+
+  return (
+    <>
+      <div className="fixed inset-0 z-50 bg-black/50" onClick={onClose} />
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-md rounded-lg border border-border-primary bg-surface-secondary p-6 shadow-xl">
+          <h3 className="text-lg font-semibold text-text-primary mb-4">Добавить пользователя</h3>
+          <div className="space-y-3">
+            <input placeholder="Имя *" value={form.name} onChange={(e) => setForm(p => ({...p, name: e.target.value}))} className="w-full rounded-md border border-border-primary bg-surface-tertiary px-3 py-2 text-sm text-text-primary" />
+            <input placeholder="Email *" type="email" value={form.email} onChange={(e) => setForm(p => ({...p, email: e.target.value}))} className="w-full rounded-md border border-border-primary bg-surface-tertiary px-3 py-2 text-sm text-text-primary" />
+            <input placeholder="Пароль *" type="password" value={form.password} onChange={(e) => setForm(p => ({...p, password: e.target.value}))} className="w-full rounded-md border border-border-primary bg-surface-tertiary px-3 py-2 text-sm text-text-primary" />
+            <select value={form.role} onChange={(e) => setForm(p => ({...p, role: e.target.value}))} className="w-full rounded-md border border-border-primary bg-surface-tertiary px-3 py-2 text-sm text-text-primary">
+              <option value="CLIENT">Клиент</option>
+              <option value="MANAGER">Менеджер</option>
+              <option value="ADMIN">Администратор</option>
+            </select>
+            <input placeholder="Компания" value={form.company} onChange={(e) => setForm(p => ({...p, company: e.target.value}))} className="w-full rounded-md border border-border-primary bg-surface-tertiary px-3 py-2 text-sm text-text-primary" />
+            <input placeholder="Телефон" value={form.phone} onChange={(e) => setForm(p => ({...p, phone: e.target.value}))} className="w-full rounded-md border border-border-primary bg-surface-tertiary px-3 py-2 text-sm text-text-primary" />
+          </div>
+          <div className="flex justify-end gap-3 mt-6">
+            <button onClick={onClose} className="px-4 py-2 text-sm text-text-secondary hover:text-text-primary">Отмена</button>
+            <button onClick={() => onSubmit(form)} disabled={isPending || !form.email || !form.password || !form.name} className="px-4 py-2 text-sm font-medium text-white bg-accent-primary rounded-md hover:bg-accent-primary/90 disabled:opacity-50">
+              {isPending ? 'Создание...' : 'Создать'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ─── Delete User Modal ───────────────────────────────────────────────────────
+
+function DeleteUserModal({ user, onClose, onConfirm, isPending }: { user: UserItem | null; onClose: () => void; onConfirm: () => void; isPending: boolean }) {
+  if (!user) return null;
+
+  return (
+    <>
+      <div className="fixed inset-0 z-50 bg-black/50" onClick={onClose} />
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-sm rounded-lg border border-border-primary bg-surface-secondary p-6 shadow-xl">
+          <h3 className="text-lg font-semibold text-text-primary mb-2">Удалить пользователя?</h3>
+          <p className="text-sm text-text-secondary mb-4">
+            Вы уверены что хотите удалить <strong>{user.name}</strong> ({user.email})? Это действие необратимо.
+          </p>
+          <div className="flex justify-end gap-3">
+            <button onClick={onClose} className="px-4 py-2 text-sm text-text-secondary hover:text-text-primary">Отмена</button>
+            <button onClick={onConfirm} disabled={isPending} className="px-4 py-2 text-sm font-medium text-white bg-status-error rounded-md hover:bg-status-error/90 disabled:opacity-50">
+              {isPending ? 'Удаление...' : 'Удалить'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
   );
 }

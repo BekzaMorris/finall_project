@@ -76,6 +76,9 @@ export default function ConfiguratorPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [matchCount, setMatchCount] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [showQuoteModal, setShowQuoteModal] = useState(false);
+  const [quoteSending, setQuoteSending] = useState(false);
+  const [quoteSuccess, setQuoteSuccess] = useState(false);
   const [config, setConfig] = useState<ConfiguratorState>({
     workloadType: null,
     cpu: { family: null, cores: null, count: null },
@@ -255,8 +258,74 @@ export default function ConfiguratorPage() {
           isLoading={isLoading}
           currentStep={currentStep}
           onShowResults={handleShowResults}
+          onQuoteClick={async () => {
+            if (quoteSending) return;
+            // Check if logged in
+            const token = localStorage.getItem('access_token');
+            if (!token) {
+              router.push('/login?redirect=/configurator');
+              return;
+            }
+            // Get user data from store
+            let userName = '', userEmail = '', userPhone = '', userCompany = '';
+            try {
+              const stored = localStorage.getItem('kiroportal-auth');
+              if (stored) {
+                const parsed = JSON.parse(stored);
+                const user = parsed?.state?.user;
+                if (user) {
+                  userName = user.name || '';
+                  userEmail = user.email || '';
+                  userPhone = user.phone || '';
+                  userCompany = user.company || '';
+                }
+              }
+            } catch {}
+
+            setQuoteSending(true);
+            try {
+              const { apiClient } = await import('@/lib/api-client');
+              await apiClient('/configurator/quote', {
+                method: 'POST',
+                body: {
+                  configuration: {
+                    workloadType: config.workloadType || undefined,
+                    cpu: config.cpu.family ? {
+                      family: config.cpu.family || undefined,
+                      cores: config.cpu.cores ? { min: parseInt(config.cpu.cores) } : undefined,
+                      count: config.cpu.count ? parseInt(config.cpu.count) : undefined,
+                    } : undefined,
+                    ram: config.ram.size ? {
+                      sizeGb: { min: parseInt(config.ram.size.replace('+', '')) },
+                      type: config.ram.type || undefined,
+                    } : undefined,
+                    storage: config.storage.type ? {
+                      type: config.storage.type || undefined,
+                    } : undefined,
+                  },
+                  contactName: userName || 'User',
+                  contactEmail: userEmail || 'user@example.com',
+                  contactPhone: userPhone || '-',
+                  company: userCompany || undefined,
+                },
+              });
+              setQuoteSuccess(true);
+              setTimeout(() => setQuoteSuccess(false), 3000);
+            } catch {
+              alert('Не удалось отправить заявку');
+            } finally {
+              setQuoteSending(false);
+            }
+          }}
         />
       </div>
+
+      {/* Quote success notification */}
+      {quoteSuccess && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-lg bg-status-success px-6 py-3 text-sm font-medium text-white shadow-lg">
+          ✓ Заявка отправлена! Мы свяжемся с вами.
+        </div>
+      )}
     </div>
   );
 }
@@ -534,12 +603,14 @@ function ConfigSidebar({
   isLoading,
   currentStep,
   onShowResults,
+  onQuoteClick,
 }: {
   config: ConfiguratorState;
   matchCount: number | null;
   isLoading: boolean;
   currentStep: number;
   onShowResults: () => void;
+  onQuoteClick: () => void;
 }) {
   const workloadLabel = WORKLOAD_TYPES.find((w) => w.id === config.workloadType)?.label;
 
@@ -620,11 +691,8 @@ function ConfigSidebar({
             Показать результаты
           </button>
           <button
-            onClick={() => {
-              // Quote form modal will be implemented in task 21.2
-              window.dispatchEvent(new CustomEvent('open-quote-modal', { detail: config }));
-            }}
-            disabled={!config.workloadType}
+            onClick={onQuoteClick}
+            disabled={!config.workloadType || !config.cpu.family || !config.ram.size || !config.storage.type}
             className="w-full px-4 py-2.5 text-sm font-medium text-text-primary bg-surface-tertiary border border-border-primary hover:border-accent-primary/50 rounded-md transition-colors disabled:opacity-50 disabled:pointer-events-none"
           >
             Отправить заявку
@@ -684,4 +752,124 @@ function formatStorageSummary(storage: ConfiguratorState['storage']): string | n
   if (storage.size) parts.push(storage.size);
   if (storage.raid && storage.raid !== 'Нет') parts.push(storage.raid);
   return parts.length > 0 ? parts.join(', ') : null;
+}
+
+/* ─── Quote Modal ─── */
+
+function QuoteModal({ config, onClose }: { config: ConfiguratorState; onClose: () => void }) {
+  const [mounted, setMounted] = useState(false);
+  const [form, setForm] = useState({ contactName: '', contactEmail: '', contactPhone: '', company: '' });
+  const [sending, setSending] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Pre-fill from localStorage auth store
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('kiroportal-auth');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        const user = parsed?.state?.user;
+        if (user) {
+          setForm({
+            contactName: user.name || '',
+            contactEmail: user.email || '',
+            contactPhone: user.phone || '',
+            company: user.company || '',
+          });
+        }
+      }
+    } catch {}
+    setMounted(true);
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.contactName || !form.contactEmail || !form.contactPhone) return;
+
+    setSending(true);
+    setError(null);
+    try {
+      const { apiClient } = await import('@/lib/api-client');
+      await apiClient('/configurator/quote', {
+        method: 'POST',
+        body: {
+          configuration: {
+            workloadType: config.workloadType,
+            cpu: config.cpu.family || config.cpu.cores || config.cpu.count ? config.cpu : undefined,
+            ram: config.ram.size || config.ram.type ? config.ram : undefined,
+            storage: config.storage.type || config.storage.size || config.storage.raid ? config.storage : undefined,
+          },
+          contactName: form.contactName,
+          contactEmail: form.contactEmail,
+          contactPhone: form.contactPhone,
+          company: form.company || undefined,
+        },
+      });
+      setSuccess(true);
+    } catch {
+      setError('Не удалось отправить заявку. Попробуйте позже.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  if (success) {
+    return (
+      <>
+        <div className="fixed inset-0 z-50 bg-black/50" onClick={onClose} />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-lg border border-border-primary bg-surface-secondary p-8 text-center shadow-xl">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-status-success/10">
+              <svg className="h-7 w-7 text-status-success" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" /></svg>
+            </div>
+            <h3 className="text-lg font-semibold text-text-primary">Заявка отправлена!</h3>
+            <p className="mt-2 text-sm text-text-secondary">Мы свяжемся с вами в ближайшее время.</p>
+            <button onClick={onClose} className="mt-6 rounded-md bg-accent-primary px-6 py-2 text-sm font-medium text-white hover:bg-accent-primary/90">
+              Закрыть
+            </button>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div className="fixed inset-0 z-50 bg-black/50" onClick={onClose} />
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-md rounded-lg border border-border-primary bg-surface-secondary p-6 shadow-xl">
+          <h3 className="text-lg font-semibold text-text-primary mb-4">Отправить заявку на конфигурацию</h3>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-text-primary">Имя *</label>
+              <input value={form.contactName} onChange={(e) => setForm(p => ({...p, contactName: e.target.value}))} required placeholder="Ваше имя" className="rounded-md border border-border-primary bg-surface-tertiary px-3 py-2 text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent-primary" />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-text-primary">Email *</label>
+              <input type="email" value={form.contactEmail} onChange={(e) => setForm(p => ({...p, contactEmail: e.target.value}))} required placeholder="email@example.com" className="rounded-md border border-border-primary bg-surface-tertiary px-3 py-2 text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent-primary" />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-text-primary">Телефон *</label>
+              <input value={form.contactPhone} onChange={(e) => setForm(p => ({...p, contactPhone: e.target.value}))} required placeholder="+7 (777) 123-45-67" className="rounded-md border border-border-primary bg-surface-tertiary px-3 py-2 text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent-primary" />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-text-primary">Компания</label>
+              <input value={form.company} onChange={(e) => setForm(p => ({...p, company: e.target.value}))} placeholder="Название компании (необязательно)" className="rounded-md border border-border-primary bg-surface-tertiary px-3 py-2 text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent-primary" />
+            </div>
+
+            {error && <p className="text-sm text-status-error">{error}</p>}
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-text-secondary hover:text-text-primary">Отмена</button>
+              <button type="submit" disabled={sending} className="px-4 py-2 text-sm font-medium text-white bg-accent-primary rounded-md hover:bg-accent-primary/90 disabled:opacity-50">
+                {sending ? 'Отправка...' : 'Отправить заявку'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </>
+  );
 }

@@ -52,6 +52,7 @@ const priorityConfig: Record<TicketPriority, { label: string; variant: 'default'
 export default function TicketsPage() {
   const router = useRouter();
   const { user } = useAuthStore();
+  const [mounted, setMounted] = useState(false);
 
   const [tickets, setTickets] = useState<TicketListItem[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -62,6 +63,11 @@ export default function TicketsPage() {
   const [currentCursor, setCurrentCursor] = useState<string | undefined>(undefined);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
+
+  // Wait for hydration
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const fetchTickets = useCallback(async (cursor?: string) => {
     setLoading(true);
@@ -92,12 +98,13 @@ export default function TicketsPage() {
   }, []);
 
   useEffect(() => {
+    if (!mounted) return;
     if (!user) {
       router.push('/login?redirect=/tickets');
       return;
     }
     fetchTickets(currentCursor);
-  }, [user, router, fetchTickets, currentCursor]);
+  }, [mounted, user, router, fetchTickets, currentCursor]);
 
   function handleNextPage() {
     if (nextCursor) {
@@ -127,7 +134,7 @@ export default function TicketsPage() {
   }
 
   // Not logged in — will redirect
-  if (!user) {
+  if (!mounted || !user) {
     return null;
   }
 

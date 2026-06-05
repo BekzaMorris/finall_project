@@ -96,6 +96,21 @@ export default function AdminTicketsPage() {
 
   // Detail modal
   const [selectedTicket, setSelectedTicket] = useState<TicketListItem | null>(null);
+  const [loadingTicket, setLoadingTicket] = useState(false);
+
+  // Load full ticket with messages when clicking
+  const openTicketDetail = async (ticket: TicketListItem) => {
+    setSelectedTicket(ticket); // Show modal immediately with basic info
+    setLoadingTicket(true);
+    try {
+      const fullTicket = await apiClient<TicketListItem>(`/tickets/${ticket.id}`);
+      setSelectedTicket(fullTicket);
+    } catch {
+      // Keep the basic ticket info if fetch fails
+    } finally {
+      setLoadingTicket(false);
+    }
+  };
 
   // Fetch tickets
   const { data, isLoading, isError } = useQuery<TicketsResponse>({
@@ -263,7 +278,7 @@ export default function AdminTicketsPage() {
                     <tr
                       key={ticket.id}
                       className="hover:bg-surface-tertiary/50 transition-colors cursor-pointer"
-                      onClick={() => setSelectedTicket(ticket)}
+                      onClick={() => openTicketDetail(ticket)}
                     >
                       <td className="px-4 py-3">
                         <span className="font-mono text-xs font-medium text-text-primary">
@@ -372,6 +387,12 @@ export default function AdminTicketsPage() {
               statusMutation.mutate({ ticketId: selectedTicket.id, status })
             }
             isChangingStatus={statusMutation.isPending}
+            onReload={async () => {
+              try {
+                const fullTicket = await apiClient<TicketListItem>(`/tickets/${selectedTicket.id}`);
+                setSelectedTicket(fullTicket);
+              } catch {}
+            }}
           />
         )}
       </Modal>
@@ -385,9 +406,10 @@ interface TicketDetailViewProps {
   ticket: TicketListItem;
   onStatusChange: (status: TicketStatus) => void;
   isChangingStatus: boolean;
+  onReload?: () => void;
 }
 
-function TicketDetailView({ ticket, onStatusChange, isChangingStatus }: TicketDetailViewProps) {
+function TicketDetailView({ ticket, onStatusChange, isChangingStatus, onReload }: TicketDetailViewProps) {
   const statusInfo = statusConfig[ticket.status];
   const priorityInfo = priorityConfig[ticket.priority];
 
@@ -435,7 +457,7 @@ function TicketDetailView({ ticket, onStatusChange, isChangingStatus }: TicketDe
             >
               <div className="flex items-center justify-between mb-1">
                 <span className="text-xs font-medium text-text-primary">
-                  {msg.userName || 'Пользователь'}
+                  {msg.user?.name || msg.userName || 'Пользователь'}
                   {msg.isInternal && (
                     <span className="ml-1.5 text-status-warning text-[10px] font-normal">
                       (внутренняя заметка)
@@ -447,7 +469,7 @@ function TicketDetailView({ ticket, onStatusChange, isChangingStatus }: TicketDe
                 </span>
               </div>
               <p className="text-text-secondary whitespace-pre-wrap">{msg.content}</p>
-              {msg.attachments.length > 0 && (
+              {Array.isArray(msg.attachments) && msg.attachments.length > 0 && (
                 <div className="mt-1 flex flex-wrap gap-1">
                   {msg.attachments.map((url, idx) => (
                     <a
@@ -466,6 +488,14 @@ function TicketDetailView({ ticket, onStatusChange, isChangingStatus }: TicketDe
           ))}
         </div>
       </div>
+
+      {/* Reply form */}
+      {ticket.status !== TicketStatus.CLOSED && (
+        <div className="border-t border-border-primary pt-4 space-y-3">
+          <h4 className="text-sm font-medium text-text-primary">Ответить клиенту</h4>
+          <ReplyForm ticketId={ticket.id} onSent={onStatusChange} onMessageSent={onReload} />
+        </div>
+      )}
 
       {/* Status change */}
       {ticket.status !== TicketStatus.CLOSED && (
@@ -491,6 +521,73 @@ function TicketDetailView({ ticket, onStatusChange, isChangingStatus }: TicketDe
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Reply Form ──────────────────────────────────────────────────────────────
+
+function ReplyForm({ ticketId, onSent, onMessageSent }: { ticketId: string; onSent: (status: TicketStatus) => void; onMessageSent?: () => void }) {
+  const [message, setMessage] = useState('');
+  const [isInternal, setIsInternal] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const queryClient = useQueryClient();
+
+  const handleSend = async () => {
+    const trimmed = message.trim();
+    if (!trimmed) return;
+
+    setSending(true);
+    try {
+      await apiClient(`/tickets/${ticketId}/messages`, {
+        method: 'POST',
+        body: { content: trimmed, isInternal },
+      });
+      setMessage('');
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 2000);
+      queryClient.invalidateQueries({ queryKey: ['admin-tickets'] });
+      // Reload ticket to show new message
+      if (onMessageSent) onMessageSent();
+    } catch {
+      // silently fail
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      <textarea
+        value={message}
+        onChange={(e) => setMessage(e.target.value)}
+        placeholder="Написать ответ клиенту..."
+        rows={3}
+        maxLength={5000}
+        className="w-full rounded-lg border border-border-primary bg-surface-tertiary px-3 py-2 text-sm text-text-primary placeholder:text-text-tertiary focus:border-accent-primary focus:outline-none focus:ring-1 focus:ring-accent-primary resize-none"
+      />
+      <div className="flex items-center justify-between">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={isInternal}
+            onChange={(e) => setIsInternal(e.target.checked)}
+            className="h-4 w-4 rounded border-border-primary"
+          />
+          <span className="text-xs text-text-secondary">Внутренняя заметка (не видна клиенту)</span>
+        </label>
+        <div className="flex items-center gap-2">
+          {success && <span className="text-xs text-status-success">Отправлено ✓</span>}
+          <Button
+            size="sm"
+            onClick={handleSend}
+            disabled={!message.trim() || sending}
+          >
+            {sending ? 'Отправка...' : 'Отправить'}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

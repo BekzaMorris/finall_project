@@ -7,6 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 import { Button, Input } from '@kiroportal/ui';
 import { apiClient, ApiClientError } from '@/lib/api-client';
+import { ImageUploader, type UploadedImage } from '@/components/admin/ImageUploader';
 
 export default function EditProductPage() {
   const params = useParams();
@@ -23,6 +24,7 @@ export default function EditProductPage() {
     diskBays: '', diskHotswap: false, formFactor: '', unitCount: '', psuWatt: '', description: '',
   });
   const [productId, setProductId] = useState<string | null>(null);
+  const [images, setImages] = useState<UploadedImage[]>([]);
 
   // Fetch product by slug via public API, fallback to searching by ID
   const { data: product, isLoading } = useQuery({
@@ -49,6 +51,13 @@ export default function EditProductPage() {
   useEffect(() => {
     if (product) {
       setProductId(product.id as string);
+      // Load existing images
+      const existingImages = (product.images as any[] || []).map((img: any) => ({
+        url: img.url,
+        key: img.id || img.url,
+        originalName: img.alt || 'image',
+      }));
+      setImages(existingImages);
       setForm({
         name: (product.name as string) || '',
         sku: (product.sku as string) || '',
@@ -121,6 +130,16 @@ export default function EditProductPage() {
       if (form.description) body.description = form.description;
 
       await apiClient(`/admin/products/${productId}`, { method: 'PATCH', body });
+
+      // Sync images: delete all existing and re-create with current list
+      await apiClient(`/admin/products/${productId}/images`, { method: 'DELETE' });
+      for (let i = 0; i < images.length; i++) {
+        await apiClient(`/admin/products/${productId}/images`, {
+          method: 'POST',
+          body: { url: images[i].url, alt: images[i].originalName, order: i, isMain: i === 0 },
+        });
+      }
+
       router.push('/admin/products');
     } catch (err) {
       if (err instanceof ApiClientError) {
@@ -243,6 +262,11 @@ export default function EditProductPage() {
             <Input label="Юниты (U)" type="number" value={form.unitCount as string} onChange={(e) => updateField('unitCount', e.target.value)} />
             <Input label="БП (Вт)" type="number" value={form.psuWatt as string} onChange={(e) => updateField('psuWatt', e.target.value)} />
           </div>
+        </section>
+
+        <section className="rounded-lg border border-border-primary bg-surface-secondary p-6">
+          <h3 className="text-base font-semibold text-text-primary mb-4">Изображения</h3>
+          <ImageUploader images={images} onChange={setImages} maxImages={10} />
         </section>
 
         <section className="rounded-lg border border-border-primary bg-surface-secondary p-6">

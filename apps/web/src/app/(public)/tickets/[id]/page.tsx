@@ -72,14 +72,20 @@ export default function TicketDetailPage() {
   const ticketId = params.id as string;
 
   const [newMessage, setNewMessage] = useState('');
+  const [mounted, setMounted] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Redirect if not authenticated
+  // Wait for hydration before checking auth
   useEffect(() => {
-    if (!user) {
+    setMounted(true);
+  }, []);
+
+  // Redirect if not authenticated (only after hydration)
+  useEffect(() => {
+    if (mounted && !user) {
       router.push(`/login?redirect=/tickets/${ticketId}`);
     }
-  }, [user, router, ticketId]);
+  }, [mounted, user, router, ticketId]);
 
   // Fetch ticket
   const { data: ticket, isLoading, isError } = useQuery<TicketDetail>({
@@ -122,7 +128,7 @@ export default function TicketDetailPage() {
 
   const isClosed = ticket?.status === TicketStatus.CLOSED;
 
-  if (!user) return null;
+  if (!mounted || !user) return null;
 
   // Loading
   if (isLoading) {

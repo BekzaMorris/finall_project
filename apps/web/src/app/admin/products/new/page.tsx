@@ -6,11 +6,13 @@ import Link from 'next/link';
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 import { Button, Input } from '@kiroportal/ui';
 import { apiClient, ApiClientError } from '@/lib/api-client';
+import { ImageUploader, type UploadedImage } from '@/components/admin/ImageUploader';
 
 export default function NewProductPage() {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [images, setImages] = useState<UploadedImage[]>([]);
 
   const [form, setForm] = useState({
     name: '',
@@ -84,6 +86,23 @@ export default function NewProductPage() {
       if (form.description) body.description = form.description;
 
       await apiClient('/admin/products', { method: 'POST', body });
+
+      // If images were uploaded, create ProductImage records
+      if (images.length > 0) {
+        // Get the created product (last one created)
+        const res = await apiClient<{ items: any[] }>('/admin/products?limit=1');
+        const createdProduct = res.items?.[0];
+        if (createdProduct) {
+          // Create image records via direct prisma (through a custom endpoint)
+          for (let i = 0; i < images.length; i++) {
+            await apiClient(`/admin/products/${createdProduct.id}/images`, {
+              method: 'POST',
+              body: { url: images[i].url, alt: images[i].originalName, order: i, isMain: i === 0 },
+            });
+          }
+        }
+      }
+
       router.push('/admin/products');
     } catch (err) {
       if (err instanceof ApiClientError) {
@@ -212,6 +231,11 @@ export default function NewProductPage() {
             <Input label="Юниты (U)" type="number" value={form.unitCount} onChange={(e) => updateField('unitCount', e.target.value)} />
             <Input label="БП (Вт)" type="number" value={form.psuWatt} onChange={(e) => updateField('psuWatt', e.target.value)} placeholder="750" />
           </div>
+        </Section>
+
+        {/* Images */}
+        <Section title="Изображения">
+          <ImageUploader images={images} onChange={setImages} maxImages={10} />
         </Section>
 
         {/* Description */}

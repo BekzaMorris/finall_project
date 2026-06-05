@@ -462,11 +462,17 @@ function OrderDetailView({
       </div>
 
       {/* Status history */}
-      {order.statusHistory.length > 0 && (
+      {(() => {
+        const history = Array.isArray(order.statusHistory)
+          ? order.statusHistory
+          : typeof order.statusHistory === 'string'
+            ? JSON.parse(order.statusHistory || '[]')
+            : [];
+        return history.length > 0 ? (
         <div>
           <h4 className="text-sm font-medium text-text-primary mb-2">История статусов</h4>
           <div className="space-y-2">
-            {order.statusHistory.map((change, idx) => (
+            {history.map((change: StatusChange, idx: number) => (
               <div
                 key={idx}
                 className="flex items-start gap-2 rounded-md border border-border-primary bg-surface-tertiary px-3 py-2 text-xs"
@@ -482,7 +488,8 @@ function OrderDetailView({
             ))}
           </div>
         </div>
-      )}
+      ) : null;
+      })()}
 
       {/* Status change controls */}
       {nextStatuses.length > 0 && (

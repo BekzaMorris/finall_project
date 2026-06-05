@@ -68,7 +68,7 @@ function formatDateTime(date: string | Date): string {
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('ru-RU', {
     style: 'currency',
-    currency: 'USD',
+    currency: 'KZT',
     minimumFractionDigits: 2,
   }).format(amount);
 }

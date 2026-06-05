@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
@@ -43,7 +43,7 @@ function formatDate(date: string | Date): string {
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('ru-RU', {
     style: 'currency',
-    currency: 'USD',
+    currency: 'KZT',
     minimumFractionDigits: 2,
   }).format(amount);
 }
@@ -54,17 +54,20 @@ function OrdersPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuthStore();
+  const [mounted, setMounted] = useState(false);
 
   const cursor = searchParams.get('cursor') ?? undefined;
   const limit = 20;
 
+  useEffect(() => { setMounted(true); }, []);
+
   // Redirect to login if not authenticated
   useEffect(() => {
-    if (!user) {
+    if (mounted && !user) {
       const currentPath = '/orders';
       router.replace(`/login?redirect=${encodeURIComponent(currentPath)}`);
     }
-  }, [user, router]);
+  }, [mounted, user, router]);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['orders', cursor, limit],
@@ -77,7 +80,7 @@ function OrdersPageContent() {
     enabled: !!user,
   });
 
-  if (!user) {
+  if (!mounted || !user) {
     return null;
   }
 

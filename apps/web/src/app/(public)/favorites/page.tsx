@@ -55,7 +55,7 @@ const stockConfig: Record<StockStatus, { label: string; icon: string }> = {
 function formatPrice(price: number): string {
   return new Intl.NumberFormat('ru-RU', {
     style: 'currency',
-    currency: 'RUB',
+    currency: 'KZT',
     maximumFractionDigits: 0,
   }).format(price);
 }
