@@ -50,23 +50,17 @@ export const env = {
   SENTRY_DSN: process.env.SENTRY_DSN || '',
 
   // iTop
-ITOP_ENABLED: process.env.ITOP_ENABLED || 'false',
-ITOP_URL: process.env.ITOP_URL || '',
-ITOP_AUTH_USER: process.env.ITOP_AUTH_USER || '',
-ITOP_AUTH_PWD: process.env.ITOP_AUTH_PWD || '',
-ITOP_TICKET_CLASS: process.env.ITOP_TICKET_CLASS || 'UserRequest',
+  ITOP_ENABLED: process.env.ITOP_ENABLED || 'false',
+  ITOP_URL: process.env.ITOP_URL || '',
+  ITOP_AUTH_USER: process.env.ITOP_AUTH_USER || '',
+  ITOP_AUTH_PWD: process.env.ITOP_AUTH_PWD || '',
+  ITOP_TICKET_CLASS: process.env.ITOP_TICKET_CLASS || 'UserRequest',
 } as const;
 
 /**
  * Validates that critical environment variables are set in production.
  * Logs warnings in development for missing optional vars.
  */
-
-console.log('ITOP_ENABLED raw =', process.env.ITOP_ENABLED);
-console.log('ITOP_URL raw =', process.env.ITOP_URL);
-console.log('ITOP_AUTH_USER raw =', process.env.ITOP_AUTH_USER);
-console.log('ITOP_AUTH_PWD raw =', process.env.ITOP_AUTH_PWD);
-
 export function validateEnv(): void {
   const required: Array<keyof typeof env> = ['DATABASE_URL'];
 
