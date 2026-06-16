@@ -52,6 +52,7 @@ export const env = {
   // iTop — variable names must match .env file
   ITOP_ENABLED: process.env.ITOP_ENABLED || 'false',
   ITOP_URL: process.env.ITOP_API_URL || '',
+  ITOP_AUTH_TOKEN: process.env.ITOP_AUTH_TOKEN || '',
   ITOP_AUTH_USER: process.env.ITOP_USERNAME || '',
   ITOP_AUTH_PWD: process.env.ITOP_PASSWORD || '',
   ITOP_TICKET_CLASS: process.env.ITOP_TICKET_CLASS || 'UserRequest',
@@ -84,17 +85,17 @@ export function validateEnv(): void {
   const isItopEnabled = env.ITOP_ENABLED === 'true';
 
   if (isItopEnabled) {
-    const itopRequired: Array<keyof typeof env> = [
-      'ITOP_URL',
-      'ITOP_AUTH_USER',
-      'ITOP_AUTH_PWD',
-    ];
+    // Need either auth_token OR both user+pwd
+    const hasToken = !!env.ITOP_AUTH_TOKEN;
+    const hasUserPwd = !!env.ITOP_AUTH_USER && !!env.ITOP_AUTH_PWD;
 
-    const missingItop = itopRequired.filter((key) => !env[key]);
+    if (!env.ITOP_URL) {
+      throw new Error('iTop integration is enabled but ITOP_API_URL is missing');
+    }
 
-    if (missingItop.length > 0) {
+    if (!hasToken && !hasUserPwd) {
       throw new Error(
-        `iTop integration is enabled, but required environment variables are missing: ${missingItop.join(', ')}`,
+        'iTop integration is enabled but no auth method provided. Set ITOP_AUTH_TOKEN or both ITOP_USERNAME and ITOP_PASSWORD',
       );
     }
   }

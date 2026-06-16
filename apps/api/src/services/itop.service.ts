@@ -104,8 +104,15 @@ export async function sendTicketToItop(input: SendTicketToItopInput): Promise<{
   };
 
   const form = new URLSearchParams();
-  form.set('auth_user', env.ITOP_AUTH_USER);
-  form.set('auth_pwd', env.ITOP_AUTH_PWD);
+
+  // Use auth_token if available, otherwise fall back to user/pwd
+  if (env.ITOP_AUTH_TOKEN) {
+    form.set('auth_token', env.ITOP_AUTH_TOKEN);
+  } else {
+    form.set('auth_user', env.ITOP_AUTH_USER);
+    form.set('auth_pwd', env.ITOP_AUTH_PWD);
+  }
+
   form.set('json_data', JSON.stringify(jsonData));
 
   const response = await fetch(apiUrl, {
