@@ -19,8 +19,6 @@ const nextConfig: NextConfig = {
       dynamic: 0,
       static: 600,
     },
-    // Allow useSearchParams without Suspense boundary (pages handle loading states themselves)
-    missingSuspenseWithCSRBailout: false,
   },
 
   // Image optimization: allow S3/MinIO image domains
