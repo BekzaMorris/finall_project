@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma.js';
 import { ValidationError, NotFoundError, ForbiddenError } from '../utils/errors.js';
 import { sanitizeHtml } from '../utils/sanitize.js';
+import { sendTicketToItop, isItopEnabled } from './itop.service.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -138,27 +139,22 @@ export function isValidTransition(from: TicketStatus, to: TicketStatus): boolean
  * Assigns a sequential ticket number (TKT-NNNNNN) and sets status to OPEN.
  */
 export async function createTicket(userId: string, input: CreateTicketInput) {
-  // Validate subject and message
   const subject = validateSubject(input.subject);
   const messageContent = validateMessageContent(input.message);
 
-  // Sanitize content
   const sanitizedMessage = sanitizeContent(messageContent);
 
-  // Get user email for the ticket
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { email: true },
+    select: { email: true, name: true },
   });
 
   if (!user) {
     throw new NotFoundError('User not found');
   }
 
-  // Generate sequential ticket number
   const ticketNumber = await generateTicketNumber();
 
-  // Create ticket with initial message in a transaction
   const ticket = await prisma.ticket.create({
     data: {
       number: ticketNumber,
@@ -182,6 +178,30 @@ export async function createTicket(userId: string, input: CreateTicketInput) {
       },
     },
   });
+
+  if (isItopEnabled()) {
+    void sendTicketToItop({
+      ticketNumber: ticket.number,
+      subject: ticket.subject,
+      description: messageContent,
+      priority: ticket.priority as TicketPriority,
+      requesterEmail: user.email,
+      requesterName: user.name,
+    })
+      .then((result) => {
+        console.log('[itop] Ticket synced successfully', {
+          localTicketNumber: ticket.number,
+          itopId: result.itopId,
+          itopRef: result.itopRef,
+        });
+      })
+      .catch((error: unknown) => {
+        console.error('[itop] Failed to sync ticket', {
+          localTicketNumber: ticket.number,
+          error,
+        });
+      });
+  }
 
   return ticket;
 }

@@ -38,6 +38,13 @@ export const env = {
 
   // Sentry
   SENTRY_DSN: process.env.SENTRY_DSN || '',
+
+  // iTop
+  ITOP_ENABLED: process.env.ITOP_ENABLED || 'false',
+  ITOP_URL: process.env.ITOP_URL || '',
+  ITOP_AUTH_USER: process.env.ITOP_AUTH_USER || '',
+  ITOP_AUTH_PWD: process.env.ITOP_AUTH_PWD || '',
+  ITOP_TICKET_CLASS: process.env.ITOP_TICKET_CLASS || 'UserRequest',
 } as const;
 
 /**
@@ -62,5 +69,23 @@ export function validateEnv(): void {
     throw new Error(
       `Missing required environment variables: ${missing.join(', ')}`,
     );
+  }
+
+  const isItopEnabled = env.ITOP_ENABLED === 'true';
+
+  if (isItopEnabled) {
+    const itopRequired: Array<keyof typeof env> = [
+      'ITOP_URL',
+      'ITOP_AUTH_USER',
+      'ITOP_AUTH_PWD',
+    ];
+
+    const missingItop = itopRequired.filter((key) => !env[key]);
+
+    if (missingItop.length > 0) {
+      throw new Error(
+        `iTop integration is enabled, but required environment variables are missing: ${missingItop.join(', ')}`,
+      );
+    }
   }
 }
