@@ -25,10 +25,6 @@ interface ItopResponse {
   objects?: Record<string, ItopCreateSuccessObject>;
 }
 
-function normalizeBaseUrl(url: string): string {
-  return url.replace(/\/+$/, '');
-}
-
 function escapeHtml(input: string): string {
   return input
     .replaceAll('&', '&amp;')
@@ -85,7 +81,9 @@ export async function sendTicketToItop(input: SendTicketToItopInput): Promise<{
     return { success: false };
   }
 
-  const baseUrl = normalizeBaseUrl(env.ITOP_URL);
+  // ITOP_URL already contains the full endpoint URL:
+  // e.g. https://itsm.bgrc.kz/webservices/rest.php?version=1.3
+  const apiUrl = env.ITOP_URL;
 
   const jsonData = {
     operation: 'core/create',
@@ -110,7 +108,7 @@ export async function sendTicketToItop(input: SendTicketToItopInput): Promise<{
   form.set('auth_pwd', env.ITOP_AUTH_PWD);
   form.set('json_data', JSON.stringify(jsonData));
 
-  const response = await fetch(`${baseUrl}/webservices/rest.php?version=1.3`, {
+  const response = await fetch(apiUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
