@@ -49,11 +49,11 @@ export const env = {
   // Sentry
   SENTRY_DSN: process.env.SENTRY_DSN || '',
 
-  // iTop
+  // iTop — variable names must match .env file
   ITOP_ENABLED: process.env.ITOP_ENABLED || 'false',
-  ITOP_URL: process.env.ITOP_URL || '',
-  ITOP_AUTH_USER: process.env.ITOP_AUTH_USER || '',
-  ITOP_AUTH_PWD: process.env.ITOP_AUTH_PWD || '',
+  ITOP_URL: process.env.ITOP_API_URL || '',
+  ITOP_AUTH_USER: process.env.ITOP_USERNAME || '',
+  ITOP_AUTH_PWD: process.env.ITOP_PASSWORD || '',
   ITOP_TICKET_CLASS: process.env.ITOP_TICKET_CLASS || 'UserRequest',
 } as const;
 
