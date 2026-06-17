@@ -10,11 +10,6 @@ const envPath = path.resolve(__dirname, '../../.env');
 
 dotenv.config({ path: envPath });
 
-/**
- * Environment configuration.
- * Loads and validates required environment variables.
- * Uses dotenv for local development.
- */
 export const env = {
   // Server
   PORT: parseInt(process.env.PORT || '4000', 10),
@@ -49,19 +44,16 @@ export const env = {
   // Sentry
   SENTRY_DSN: process.env.SENTRY_DSN || '',
 
-  // iTop — variable names must match .env file
+  // iTop
   ITOP_ENABLED: process.env.ITOP_ENABLED || 'false',
   ITOP_URL: process.env.ITOP_API_URL || '',
   ITOP_AUTH_TOKEN: process.env.ITOP_AUTH_TOKEN || '',
   ITOP_AUTH_USER: process.env.ITOP_USERNAME || '',
   ITOP_AUTH_PWD: process.env.ITOP_PASSWORD || '',
   ITOP_TICKET_CLASS: process.env.ITOP_TICKET_CLASS || 'UserRequest',
+  ITOP_ORG_ID: parseInt(process.env.ITOP_ORG_ID || '5', 10),
 } as const;
 
-/**
- * Validates that critical environment variables are set in production.
- * Logs warnings in development for missing optional vars.
- */
 export function validateEnv(): void {
   const required: Array<keyof typeof env> = ['DATABASE_URL'];
 
@@ -85,7 +77,6 @@ export function validateEnv(): void {
   const isItopEnabled = env.ITOP_ENABLED === 'true';
 
   if (isItopEnabled) {
-    // Need either auth_token OR both user+pwd
     const hasToken = !!env.ITOP_AUTH_TOKEN;
     const hasUserPwd = !!env.ITOP_AUTH_USER && !!env.ITOP_AUTH_PWD;
 

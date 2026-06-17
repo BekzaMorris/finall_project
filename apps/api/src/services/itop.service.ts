@@ -81,8 +81,6 @@ export async function sendTicketToItop(input: SendTicketToItopInput): Promise<{
     return { success: false };
   }
 
-  // ITOP_URL already contains the full endpoint URL:
-  // e.g. https://itsm.bgrc.kz/webservices/rest.php?version=1.3
   const apiUrl = env.ITOP_URL;
 
   const jsonData = {
@@ -91,6 +89,7 @@ export async function sendTicketToItop(input: SendTicketToItopInput): Promise<{
     class: env.ITOP_TICKET_CLASS,
     output_fields: 'id,friendlyname',
     fields: {
+      org_id: env.ITOP_ORG_ID,
       title: `[${input.ticketNumber}] ${input.subject}`,
       description: toItopHtmlDescription({
         ticketNumber: input.ticketNumber,
@@ -105,7 +104,6 @@ export async function sendTicketToItop(input: SendTicketToItopInput): Promise<{
 
   const form = new URLSearchParams();
 
-  // Use auth_token if available, otherwise fall back to user/pwd
   if (env.ITOP_AUTH_TOKEN) {
     form.set('auth_token', env.ITOP_AUTH_TOKEN);
   } else {
@@ -117,9 +115,7 @@ export async function sendTicketToItop(input: SendTicketToItopInput): Promise<{
 
   const response = await fetch(apiUrl, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: form.toString(),
   });
 
